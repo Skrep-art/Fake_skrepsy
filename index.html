@@ -1,0 +1,310 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Количество скрепсов — ДЕМО</title>
+<style>
+  * { box-sizing: border-box; }
+
+  html, body {
+    margin: 0;
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+    font-family: Arial, sans-serif;
+    background: #fff;
+    color: #222;
+  }
+
+  .background {
+    position: fixed;
+    inset: 0;
+    overflow: hidden;
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .square {
+    position: absolute;
+    width: var(--size);
+    height: var(--size);
+    left: var(--left);
+    top: -120px;
+    background: rgba(130, 130, 130, 0.10);
+    border: 1px solid rgba(120, 120, 120, 0.06);
+    transform: rotate(var(--rotation));
+    animation: drift var(--duration) linear infinite;
+    animation-delay: var(--delay);
+  }
+
+  @keyframes drift {
+    0% {
+      transform: translate(0, 0) rotate(var(--rotation));
+      opacity: 0;
+    }
+    12% { opacity: 1; }
+    88% { opacity: 1; }
+    100% {
+      transform: translate(42vw, 120vh) rotate(calc(var(--rotation) + 80deg));
+      opacity: 0;
+    }
+  }
+
+  .demo-badge {
+    position: fixed;
+    top: 12px;
+    right: 14px;
+    z-index: 5;
+    padding: 6px 9px;
+    border-radius: 8px;
+    background: rgba(0,0,0,.06);
+    color: #888;
+    font-size: 11px;
+    letter-spacing: .5px;
+    user-select: none;
+  }
+
+  .screen {
+    position: relative;
+    z-index: 2;
+    width: 100%;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+  }
+
+  .panel {
+    width: min(420px, 92vw);
+    text-align: center;
+  }
+
+  h1 {
+    margin: 0 0 24px;
+    font-size: clamp(25px, 6vw, 38px);
+    font-weight: 600;
+  }
+
+  .form-area {
+    opacity: 1;
+    transform: translateY(0);
+    transition: opacity .35s ease, transform .35s ease;
+  }
+
+  .form-area.hidden {
+    opacity: 0;
+    transform: translateY(8px);
+    pointer-events: none;
+  }
+
+  input {
+    width: 100%;
+    height: 54px;
+    padding: 0 18px;
+    border: 2px solid #ddd;
+    border-radius: 12px;
+    outline: none;
+    font-size: 20px;
+    text-align: center;
+    transition: border-color .2s, box-shadow .2s;
+    background: rgba(255,255,255,.88);
+  }
+
+  input:focus {
+    border-color: #aaa;
+    box-shadow: 0 0 0 4px rgba(0,0,0,.04);
+  }
+
+  button {
+    width: 100%;
+    height: 54px;
+    margin-top: 14px;
+    border: 0;
+    border-radius: 12px;
+    background: #222;
+    color: #fff;
+    font-size: 18px;
+    cursor: pointer;
+    transition: transform .15s, background .15s;
+  }
+
+  button:hover { background: #333; }
+  button:active { transform: scale(.98); }
+
+  .loading {
+    display: none;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 18px;
+  }
+
+  .loading.active { display: flex; }
+
+  .spinner {
+    width: 52px;
+    height: 52px;
+    border: 5px solid #e6e6e6;
+    border-top-color: #555;
+    border-radius: 50%;
+    animation: spin .75s linear infinite;
+  }
+
+  @keyframes spin {
+    to { transform: rotate(360deg); }
+  }
+
+  .loading-text {
+    color: #777;
+    font-size: 16px;
+  }
+
+  .success {
+    display: none;
+    color: #20a64a;
+    font-size: clamp(20px, 5vw, 30px);
+    font-weight: 600;
+    line-height: 1.25;
+    animation: successInOut 2.2s ease both;
+  }
+
+  .success.show { display: block; }
+
+  @keyframes successInOut {
+    0% { opacity: 0; transform: translateY(8px); }
+    22% { opacity: 1; transform: translateY(0); }
+    72% { opacity: 1; transform: translateY(0); }
+    100% { opacity: 0; transform: translateY(-8px); }
+  }
+
+  .error {
+    min-height: 22px;
+    margin-top: 8px;
+    color: #d33;
+    font-size: 14px;
+  }
+</style>
+</head>
+<body>
+  <div class="background" id="background"></div>
+
+
+  <main class="screen">
+    <section class="panel" aria-live="polite">
+      <h1>Количество скрепсов</h1>
+
+      <div class="form-area" id="formArea">
+        <input
+          id="amount"
+          type="number"
+          inputmode="numeric"
+          min="1"
+          step="1"
+          placeholder="Введите число"
+          aria-label="Количество скрепсов"
+        >
+        <div class="error" id="error"></div>
+        <button id="getButton" type="button">Получить</button>
+      </div>
+
+      <div class="loading" id="loading">
+        <div class="spinner" aria-label="Загрузка"></div>
+        <div class="loading-text">Обработка...</div>
+      </div>
+
+      <div class="success" id="success">
+        оплата прошла успешна !
+      </div>
+    </section>
+  </main>
+
+<script>
+(() => {
+  "use strict";
+
+  const background = document.getElementById("background");
+  const formArea = document.getElementById("formArea");
+  const amount = document.getElementById("amount");
+  const button = document.getElementById("getButton");
+  const loading = document.getElementById("loading");
+  const success = document.getElementById("success");
+  const error = document.getElementById("error");
+
+  // Создаём фоновые полупрозрачные квадраты.
+  const squareCount = 18;
+
+  for (let i = 0; i < squareCount; i++) {
+    const square = document.createElement("div");
+    square.className = "square";
+
+    const size = 25 + Math.random() * 85;
+    const left = -15 + Math.random() * 90;
+    const duration = 7 + Math.random() * 8;
+    const delay = -(Math.random() * duration);
+    const rotation = Math.round(Math.random() * 90);
+
+    square.style.setProperty("--size", `${size}px`);
+    square.style.setProperty("--left", `${left}vw`);
+    square.style.setProperty("--duration", `${duration}s`);
+    square.style.setProperty("--delay", `${delay}s`);
+    square.style.setProperty("--rotation", `${rotation}deg`);
+
+    background.appendChild(square);
+  }
+
+  function showForm() {
+    loading.classList.remove("active");
+    success.classList.remove("show");
+
+    formArea.classList.remove("hidden");
+    amount.disabled = false;
+    button.disabled = false;
+    amount.focus();
+  }
+
+  function startFakePayment() {
+    const value = amount.value.trim();
+
+    if (!value || Number(value) <= 0 || !Number.isInteger(Number(value))) {
+      error.textContent = "Введите целое число больше нуля.";
+      amount.focus();
+      return;
+    }
+
+    error.textContent = "";
+    amount.disabled = true;
+    button.disabled = true;
+
+    formArea.classList.add("hidden");
+
+    // Небольшая задержка только для плавного исчезновения формы.
+    setTimeout(() => {
+      loading.classList.add("active");
+
+      // Ровно 1 секунда притворной загрузки.
+      setTimeout(() => {
+        loading.classList.remove("active");
+        success.classList.add("show");
+
+        // После исчезновения сообщения форма возвращается.
+        setTimeout(() => {
+          showForm();
+          amount.value = "";
+        }, 2200);
+      }, 1000);
+    }, 350);
+  }
+
+  button.addEventListener("click", startFakePayment);
+
+  amount.addEventListener("keydown", (event) => {
+    if (event.key === "Enter") {
+      startFakePayment();
+    }
+  });
+})();
+</script>
+</body>
+</html>
